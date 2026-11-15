@@ -16,8 +16,8 @@ SUBNET_NAME = "public subnet-v2ray"
 ARM_OCPUS = 1
 ARM_MEMORY_GB = 6
 TRY_MICRO_TOO = True
-TRIES_PER_RUN = 3
-SECONDS_BETWEEN_TRIES = 45
+TRIES_PER_RUN = 4
+SECONDS_BETWEEN_TRIES = 65
 # ------------------------------------------
 
 ARM_SHAPE = "VM.Standard.A1.Flex"
@@ -107,25 +107,24 @@ def main():
             )
         return d
 
+    # Oracle allows about one create attempt per minute, so alternate shapes
     for n in range(1, TRIES_PER_RUN + 1):
-        for shape, image_id in attempts:
-            try:
-                compute.launch_instance(details(shape, image_id))
-                log(f"SUCCESS: created {shape}")
-                set_output("created", "true")
-                set_output("shape", shape)
-                return 0
-            except oci.exceptions.ServiceError as e:
-                text = (e.message or "").lower()
-                if "capacity" in text:
-                    log(f"Try {n}: {shape} out of capacity")
-                    time.sleep(15)  # small gap so Oracle doesn't rate limit us
-                elif e.status == 429:
-                    log("Rate limited, waiting 40s")
-                    time.sleep(40)
-                else:
-                    log(f"Unexpected error ({e.status} {e.code}): {e.message}")
-                    return 1
+        shape, image_id = attempts[(n - 1) % len(attempts)]
+        try:
+            compute.launch_instance(details(shape, image_id))
+            log(f"SUCCESS: created {shape}")
+            set_output("created", "true")
+            set_output("shape", shape)
+            return 0
+        except oci.exceptions.ServiceError as e:
+            text = (e.message or "").lower()
+            if "capacity" in text:
+                log(f"Try {n}: {shape} out of capacity")
+            elif e.status == 429:
+                log(f"Try {n}: {shape} rate limited")
+            else:
+                log(f"Unexpected error ({e.status} {e.code}): {e.message}")
+                return 1
         if n < TRIES_PER_RUN:
             time.sleep(SECONDS_BETWEEN_TRIES)
 
