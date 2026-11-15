@@ -16,8 +16,8 @@ SUBNET_NAME = "public subnet-v2ray"
 ARM_OCPUS = 1
 ARM_MEMORY_GB = 6
 TRY_MICRO_TOO = True
-TRIES_PER_RUN = 4
-SECONDS_BETWEEN_TRIES = 55
+TRIES_PER_RUN = 3
+SECONDS_BETWEEN_TRIES = 45
 # ------------------------------------------
 
 ARM_SHAPE = "VM.Standard.A1.Flex"
@@ -119,9 +119,10 @@ def main():
                 text = (e.message or "").lower()
                 if "capacity" in text:
                     log(f"Try {n}: {shape} out of capacity")
+                    time.sleep(15)  # small gap so Oracle doesn't rate limit us
                 elif e.status == 429:
-                    log("Rate limited, skipping rest of this run")
-                    return 0
+                    log("Rate limited, waiting 40s")
+                    time.sleep(40)
                 else:
                     log(f"Unexpected error ({e.status} {e.code}): {e.message}")
                     return 1
